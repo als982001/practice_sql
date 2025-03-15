@@ -153,3 +153,73 @@ CREATE VIEW v_flop_or_not AS SELECT CASE WHEN revenue < budget THEN 'Flop' ELSE 
 SELECT * FROM v_flop_or_not;
 
 DROP VIEW v_flop_or_not;
+
+-- List movies with a (rating | revenue) higher than the average (rating | revenue) of all movies
+SELECT AVG(rating) FROM movies; -- 5.73346691~
+SELECT COUNT(*) FROM movies where rating > 5.73346691;
+
+-- Independent Subqueries
+SELECT COUNT(*) FROM movies WHERE rating > (SELECT AVG(rating) FROM movies);
+
+-- CTE
+WITH avg_revenue_cte AS (
+  SELECT 
+  	AVG(revenue)
+  FROM
+  	movies
+)
+SELECT
+	title,
+  director, 
+  revenue,
+  round((SELECT * FROM avg_revenue_cte), 0) AS avg_revenue
+FROM
+	movies
+WHERE
+	revenue > (SELECT * from avg_revenue_cte);
+  
+WITH avg_revenue_cte AS (
+  SELECT 
+  	AVG(revenue)
+  FROM
+  	movies
+),
+avg_rating_cte AS (
+  SELECT
+  	AVG(rating)
+  FROM
+  	movies
+)
+SELECT
+	title,
+  director, 
+  revenue,
+  rating,
+  round((SELECT * FROM avg_revenue_cte), 0) AS avg_revenue,
+  round((SELECT * FROM avg_rating_cte), 0) AS avg_rating
+FROM
+	movies
+WHERE
+	revenue > (SELECT * from avg_revenue_cte)
+  AND rating > (SELECT * from avg_rating_cte);
+
+-- Find the movies with a rating higher than the average rating of movies released in the same year.
+
+-- 최적화 안 된 코드
+SELECT 
+	main_movies.title, 
+  main_movies.director, 
+  main_movies.rating
+FROM movies AS main_movies -- AS 안 적어도 됨
+WHERE 
+	main_movies.rating > (
+  	SELECT 
+    	AVG(inner_movies.rating) 
+    FROM movies AS inner_movies
+    WHERE inner_movies.release_date = main_movies.release_date
+  );
+
+
+
+
+
