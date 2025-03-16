@@ -218,8 +218,186 @@ WHERE
     FROM movies AS inner_movies
     WHERE inner_movies.release_date = main_movies.release_date
   );
+  
+-- 최적화 안 된 코드 2  
+SELECT 
+	main_movies.title,
+  main_movies.director,
+  main_movies.rating,
+  main_movies.release_date,
+  (
+    SELECT
+    	AVG(inner_movies.rating)
+    FROM
+    	movies AS inner_movies
+    WHERE
+    	inner_movies.release_date = main_movies.release_date) AS year_average
+  FROM
+  	movies AS main_movies
+  WHERE
+  	main_movies.release_date > 2020
+    AND main_movies.rating > (
+      SELECT
+      	AVG(inner_movies.rating)
+      FROM
+      	movies AS inner_movies
+      WHERE 
+      	inner_movies.release_date = main_movies.release_date);
+
+-- 최적화 안 된 코드 2 수정
+WITH movie_avg_per_year AS (
+  SELECT
+  	AVG(inner_movies.rating)
+  FROM
+  	movies AS inner_movies
+	WHERE
+		inner_movies.release_date = main_movies.release_date
+)
+SELECT 
+	main_movies.title,
+  main_movies.director,
+  main_movies.rating,
+  main_movies.release_date,
+  (SELECT * FROM movie_avg_per_year) AS year_average
+  FROM
+  	movies AS main_movies
+  WHERE
+  	main_movies.release_date > 2020
+    AND main_movies.rating > (
+      SELECT * FROM movie_avg_per_year
+    );    
+  
+  
+-- List movies with a rating higher than the average rating of movies in their genre
+SELECT 
+	title, genres, rating 
+FROM movies AS main_movies
+WHERE 
+	rating > (
+    SELECT 
+    	AVG(inner_movies.rating) AS avg_rating 
+    FROM 
+    	movies AS inner_movies
+    WHERE 
+    	inner_movies.genre IS NOT NULL 
+    	main_movies.genres IS NOT NULL
+    	AND inner_movies.genres = main_movies.genres
+  ) 
+GROUP BY genres;
 
 
 
+-- Find the directors with a carrer revenue higher than the average revenue of all directors
+-- 1. 감독별 total revenue 구하기
+SELECT director, SUM(revenue) AS career_revenue FROM movies WHERE revenue IS NOT NULL AND director IS NOT NULL GROUP BY director;
+-- 2. 1번에서 구한 걸 CTE로 변환해서 이용
+WITH directors_revenue AS (
+  SELECT director, SUM(revenue) AS career_revenue 
+  FROM movies 
+  WHERE revenue IS NOT NULL AND director IS NOT NULL 
+  GROUP BY director
+), avg_director_carrer_revenue AS (
+  SELECT AVG(career_revenue) FROM directors_revenue
+)
+SELECT director, SUM(revenue) AS total_revenue, (SELECT * FROM avg_director_carrer_revenue) AS peers_avg
+FROM movies 
+WHERE revenue IS NOT NULL AND director IS NOT NULL
+GROUP BY director
+HAVING total_revenue > (SELECT * FROM avg_director_carrer_revenue);    
+    
+    
+-- director
+-- avg_rating
+-- total_movies
+-- best_rating
+-- worst_rating
+-- highest_budget
+-- lowest_budet
+-- best_rated_movie
+-- worst_rated_movie
+-- most_expensive_movie
+-- least_expensive_movie
+WITH director_stats AS (
+  SELECT
+  	director,
+  	COUNT(*) AS total_movies,
+  	AVG(rating) AS avg_rating,
+  	MAX(rating) AS best_rating,
+  	MIN(rating) AS worst_rating,
+  	MAX(budget) AS highest_budget,
+  	MIN(budget) AS lowest_budget
+  FROM
+  	movies
+  WHERE
+  	director IS NOT NULL
+  	AND budget IS NOT NULL
+  	AND rating IS NOT NULL
+  GROUP BY
+  	director
+  -- HAVING total_movies > 2
+  -- LIMIT 20
+) 
+SELECT
+	director, 
+  total_movies, 
+  avg_rating,
+  best_rating,
+  worst_rating,
+  highest_budget,
+  lowest_budget,
+  (
+  SELECT
+  	title
+  FROM
+  	movies
+  WHERE
+  	rating IS NOT NULL 
+  	AND budget IS NOT NULL
+  	AND director = ds.director
+  ORDER BY 
+  	rating DESC
+  LIMIT 1
+) AS best_rated_movie,
+(
+  SELECT
+  	title
+  FROM
+  	movies
+  WHERE
+  	rating IS NOT NULL 
+  	AND budget IS NOT NULL
+  	AND director = ds.director
+  ORDER BY 
+  	rating ASC
+  LIMIT 1
+) AS worst_rated_movie,
+(
+  SELECT
+  	title
+  FROM
+  	movies
+  WHERE
+  	rating IS NOT NULL 
+  	AND budget IS NOT NULL
+  	AND director = ds.director
+  ORDER BY 
+  	budget DESC
+  LIMIT 1
+) AS most_expensive_movie,
+(
+  SELECT
+  	title
+  FROM
+  	movies
+  WHERE
+  	rating IS NOT NULL 
+  	AND budget IS NOT NULL
+  	AND director = ds.director
+  ORDER BY 
+  	budget ASC
+  LIMIT 1
+) AS least_expensive_movie
+FROM director_stats AS ds;
 
+CREATE INDEX idx_director ON movies (director);
 
