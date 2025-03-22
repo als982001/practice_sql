@@ -401,3 +401,38 @@ FROM director_stats AS ds;
 
 CREATE INDEX idx_director ON movies (director);
 
+SELECT * FROM movies WHERE director = 'Guy Ritchie';
+
+CREATE INDEX idx_director ON movies (director);
+
+DROP INDEX idx_director;
+
+
+EXPLAIN QUERY plan SELECT
+	title
+FROM
+	movies
+WHERE
+	revenue > 100 
+  AND rating = 8 AND release_date > 2020;
+  
+  
+CREATE INDEX idx ON movies (rating, release_date, revenue);
+
+DROP INDEX idx;
+
+SELECT
+	title
+FROM
+	movies
+WHERE
+	rating > 7;
+  
+CREATE INDEX idx ON movies (rating);
+CREATE INDEX idx ON movies (rating, title, director, release_date);
+DROP INDEX idx;
+
+
+
+
+
