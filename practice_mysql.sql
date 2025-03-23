@@ -102,3 +102,118 @@ CREATE TABLE users (
 
 
 
+INSERT INTO users (
+  username, 
+  email,
+  gender,
+  interests,
+  bio,
+  age,
+  is_admin,
+  birth_date,
+  bed_time,
+  graduation_year
+) VALUES (
+  'mr.nobody',
+  'mr@nobody.com',
+  'Male',
+  'Travel,Food,Technology',
+  'I like traveling and eating',
+  88,
+  TRUE,
+  '1999.05.08', -- 19990508 1999-05-08 1999/05/08
+  '22:30', -- 223000 22:30:00 22
+  '1976'
+);
+
+-- drop column
+ALTER TABLE users DROP COLUMN profile_picture;
+
+-- rename column
+ALTER TABLE users CHANGE COLUMN about_me bio TINYTEXT;
+ALTER TABLE users CHANGE COLUMN about_me about_me TEXT;
+
+-- change the column type
+ALTER TABLE users MODIFY COLUMN about_me TINYTEXT;
+
+-- rename database
+ALTER TABLE users RENAME TO customers;
+ALTER TABLE customers RENAME TO users;
+
+-- drop constraints
+ALTER TABLE users DROP CONSTRAINT uq_email;
+ALTER TABLE users
+	DROP CONSTRAINT username, -- username의 UNIQUE
+  DROP CONSTRAINT chk_age,
+  DROP CONSTRAINT uq_email;
+  
+-- adding constraints
+ALTER TABLE users
+	ADD CONSTRAINT uq_email UNIQUE (email),
+  ADD CONSTRAINT uq_username UNIQUE (username),
+  ADD CONSTRAINT chk_age CHECK (age < 100);
+  
+ALTER TABLE users MODIFY COLUMN bed_time TIME NULL; -- NULL을 추가하는 것으로, NULL도 허용 가능
+ALTER TABLE users MODIFY COLUMN bed_time TIME NOT NULL; -- NOT NULL을 추가하는 것으로, NULL 허용 안하게 변경
+
+SHOW CREATE TABLE users;
+
+-- Incorrect date value: '1976' for column 'graduation_year' at row 1
+ALTER TABLE users MODIFY COLUMN graduation_year DATE;
+
+-- 해결법 1. 컬럼 새로 생성 후 적용
+ALTER TABLE users ADD COLUMN graduation_date DATE;
+SELECT graduation_year, MAKEDATE(graduation_year, 1) FROM users;
+UPDATE users SET graduation_date = MAKEDATE(graduation_year, 1);
+ALTER TABLE users DROP COLUMN graduation_year;
+ALTER TABLE users MODIFY COLUMN graduation_date DATE NOT NULL;
+
+CREATE TABLE users_v2( 
+  user_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  first_name VARCHAR(50),
+  last_name VARCHAR(50),
+  email VARCHAR(100),
+  full_name VARCHAR(101) GENERATED ALWAYS AS (CONCAT(first_name, ' ', last_name)) STORED
+);
+  
+INSERT INTO users_v2 (
+  first_name, last_name, email
+) VALUES ('aaa', 'bbbbb', 'aaa@email.com');
+
+SELECT * FROM users_v2;
+
+ALTER TABLE users_v2 ADD COLUMN email_domain VARCHAR(50) GENERATED ALWAYS AS (SUBSTRING_INDEX(email, '@', -1)) VIRTUAL;
+                                              
+DROP TABLE users_v2;                                              
+
+
+
+
+                                              
+/*
+SHOW CREATE TABLE users;의 결과 예시 
+
+CREATE TABLE `users` (
+  `user_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `username` char(10) NOT NULL,
+  `email` varchar(50) NOT NULL,
+  `gender` enum('Male','Female') NOT NULL,
+  `interests` set('Technology','Sports','Music','Art','Travel','Food','Fashion','Science') NOT NULL,
+  `bio` text NOT NULL,
+  `profile_picture` tinyblob,
+  `age` tinyint unsigned NOT NULL,
+  `is_admin` tinyint(1) NOT NULL DEFAULT '0',
+  `balance` float NOT NULL DEFAULT '0',
+  `joined_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `birth_date` date NOT NULL,
+  `bed_time` time NOT NULL,
+  `graduation_year` year NOT NULL,
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `email` (`email`),
+  UNIQUE KEY `uq_email` (`email`),
+  UNIQUE KEY `uq_username` (`username`),
+  CONSTRAINT `chk_age` CHECK ((`age` < 100))
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+*/
+
