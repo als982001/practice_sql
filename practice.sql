@@ -221,3 +221,362 @@ SELECT
 FROM
 	dogs 
   RIGHT JOIN owners ON dogs.owner_id = owners.owner_id;
+
+  -- List all dogs with their breed names
+SELECT dogs.name as dog_name, breeds.name as breed_name FROM dogs INNER JOIN breeds USING(breed_id);
+  
+-- Show all owners and their dogs (if they hav any)
+SELECT 
+	owners.name as owner_name, dogs.name as dog_name 
+FROM 
+	owners INNER JOIN dogs ON dogs.owner_id = owners.owner_id;
+  
+-- Display all breeds and the dogs of that breed (if any)
+SELECT breeds.name as breed_name, dogs.name as dog_name FROM breeds INNER JOIN dogs ON dogs.breed_id = breeds.breed_id;
+
+-- List all dogs with their pet passport information and owner data (if available)
+SELECT 
+	d.name as dog_name, 
+  pp.blood_type, 
+  pp.allergies, 
+  pp.last_checkup_date, 
+  o.name as owner_name,
+  o.email as email
+FROM 
+	dogs d 
+  INNER JOIN pet_passports pp ON pp.dog_id = d.dog_id
+  JOIN owners o USING (owner_id);
+  
+-- Show all tricks and the dogs that know them
+-- 내가 작성한 코드
+WITH dog_trick_ids AS (
+  SELECT 
+		dog_tricks.trick_id as dog_trick_id,
+  	dogs.name as dog_name
+	FROM 
+		dog_tricks INNER JOIN dogs ON dogs.dog_id = dog_tricks.dog_id
+)
+SELECT 
+	tricks.name as trick_name,
+  dog_trick_ids.dog_name
+FROM
+	tricks JOIN dog_trick_ids ON tricks.trick_id = dog_trick_ids.dog_trick_id;
+
+SELECT 
+	tricks.name, 
+  dogs.`name`,
+  dog_tricks.date_learned,
+  dog_tricks.proficiency
+FROM tricks 
+	JOIN dog_tricks USING (trick_id)
+  JOIN dogs using (dog_id);
+
+-- Display all dogs that don't know a single trick
+SELECT dogs.name, dog_tricks.dog_id
+FROM dogs
+	LEFT JOIN dog_tricks USING (dog_id)
+WHERE dog_tricks.dog_id IS NULL;
+  
+-- Show all breeds and the count of dogs for each breed
+SELECT breeds.name, count(*)
+FROM breeds
+	RIGHT JOIN dogs USING (breed_id)
+  GROUP BY breeds.name;
+
+-- Display all owners with the count of their dogs, the average dog weight and the average dog age.
+SELECT 
+	owners.name AS owner_name, 
+  AVG(dogs.weight) AS dog_avg_weight, 
+  COUNT(dogs.dog_id) AS dog_count,
+  AVG(TIMESTAMPDIFF(YEAR, dogs.date_of_birth, CURDATE())) AS avg_age
+FROM owners
+LEFT JOIN dogs USING (owner_id)
+GROUP BY owners.owner_id;
+
+-- Show all tricks and the number of dogs that know each trick ordered by popularity
+SELECT 
+	tricks.name AS trick_name,
+  COUNT(*) AS total_dogs
+FROM tricks 
+	JOIN dog_tricks USING (trick_id)
+GROUP BY	tricks.trick_id
+ORDER BY total_dogs DESC;
+
+-- Display all dogs along with the count of tricks they know
+SELECT 
+	dogs.name AS dog_name,
+ 	COUNT(*) AS known_tricks
+FROM dogs
+JOIN dog_tricks USING (dog_id)
+GROUP BY dogs.dog_id
+ORDER BY known_tricks DESC;
+
+-- List all owners with their dogs and the tricks their dogs know
+SELECT 
+	o.name AS owner_name,
+  d.name AS dog_name,
+  t.name AS trick_name
+FROM owners o
+JOIN dogs d USING (owner_id)
+JOIN dog_tricks dt USING (dog_id)
+JOIN tricks t USING (trick_id);
+
+-- Show all breeds with their average dog weight and typical lifespan
+SELECT 
+	breeds.breed_id AS breed_id,
+  breeds.name AS breed_name,
+  AVG(dogs.weight) AS avg_weight,
+  breeds.typical_lifespan
+FROM breeds
+JOIN dogs ON breeds.breed_id = dogs.breed_id
+GROUP BY breeds.breed_id;
+
+-- Display all dogs with their 
+-- latest checkup date 
+-- and the time since their last checkup
+SELECT 
+	dogs.name AS dog_name,
+  pp.last_checkup_date,
+  TIMESTAMPDIFF(DAY, pp.last_checkup_date, CURDATE())
+FROM dogs
+JOIN pet_passports pp USING (dog_id);
+
+-- Display all breeds with the name of the heaviest dog of that breed
+SELECT
+	breeds.breed_id,
+	breeds.name AS breed_name,
+  dogs.name AS dog_name,
+  dogs.weight
+FROM breeds
+JOIN dogs USING (breed_id)
+WHERE dogs.weight = (
+  SELECT MAX(d1.weight)
+  FROM dogs d1
+  WHERE d1.breed_id = breeds.breed_id
+);
+
+-- List all tricks with the name of the dog who learned it most recently
+SELECT 
+	tricks.name AS trick_name,
+  dogs.name AS dog_name,
+  dog_tricks.date_learned
+FROM tricks
+	JOIN dog_tricks USING (trick_id)
+	JOIN dogs USING (dog_id)
+WHERE dog_tricks.date_learned = (
+  SELECT
+    MAX(dt.date_learned)
+  FROM dog_tricks dt
+  WHERE dt.trick_id = tricks.trick_id
+	GROUP BY trick_id
+);
+
+-- movies normalization
+
+-- Normalization Status
+CREATE TABLE statuses (
+  status_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  status_name ENUM (
+    'Canceled',
+    'In Production',
+    'Planned',
+    'Post Production',
+    'Released',
+    'Rumored'
+	) NOT NULL,
+  explanation TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+);
+
+INSERT 
+	INTO statuses (status_name) 
+SELECT status FROM movies GROUP BY status;
+ 
+ALTER TABLE movies ADD COLUMN status_id BIGINT UNSIGNED; 
+  
+ALTER TABLE movies ADD CONSTRAINT fk_status FOREIGN KEY (status_id) REFERENCES statuses (status_id) ON DELETE SET NULL;   
+  
+UPDATE movies SET status_id = (SELECT status_id FROM statuses WHERE status_name = movies.status);  
+  
+ALTER TABLE movies DROP COLUMN status; 
+  
+  
+-- Normalizing Directors
+CREATE TABLE directors (
+  director_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(120),
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+);
+
+INSERT INTO 
+	directors (name)
+SELECT 
+	director 
+FROM movies 
+GROUP BY 
+	director 
+HAVING director <> '';
+  
+ALTER TABLE movies ADD COLUMN director_id BIGINT UNSIGNED;
+
+ALTER TABLE movies ADD CONSTRAINT fk_director FOREIGN KEY (director_id) REFERENCES directors (director_id) ON DELETE SET NULL;
+ 
+CREATE INDEX idx_director_name ON directors (name);
+ 
+UPDATE 
+	movies 
+SET 
+	director_id = (
+    SELECT director_id 
+    FROM directors 
+    WHERE name = movies.director
+);
+  
+ALTER TABLE movies DROP COLUMN director;
+  
+-- Normalizing Original Language
+CREATE TABLE langs (
+	lang_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(120),
+  code CHAR(2),
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+);
+
+INSERT INTO langs (code)
+SELECT original_language
+FROM movies
+GROUP BY original_language;
+
+ALTER TABLE movies ADD COLUMN original_lang_id BIGINT UNSIGNED;
+
+ALTER TABLE movies
+ADD CONSTRAINT fk_org_lang FOREIGN KEY (original_lang_id) 
+REFERENCES langs (lang_id) ON DELETE SET NULL;
+
+UPDATE movies SET original_lang_id = (SELECT lang_id FROM langs WHERE code = movies.original_language);
+
+ALTER TABLe movies DROP COLUMN original_language;
+
+-- Normalizing Countries
+CREATE TABLE countries (
+  country_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  country_code CHAR(2) UNIQUE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+);
+
+INSERT INTO countries (country_code)
+SELECT country 
+FROM movies 
+WHERE country NOT LIKE '%,%'
+GROUP BY country;
+
+-- JOIN은 기본적으로 테이블을 수평적으로 합침(수평적으로 테이블을 확장)
+-- UNION은 기본적으로 테이블을 합쳐주는데, 중복된 값들은 삭제함
+-- UNION ALL은 중복된 값을 삭제 안함
+SELECT 'a', 1
+UNION
+SELECT 'b', 2;
+
+INSERT IGNORE INTO countries (country_code)
+SELECT 
+  SUBSTRING_INDEX(country, ',', 1)
+FROM movies 
+WHERE country LIKE '__,__'
+GROUP BY country
+UNION
+SELECT 
+  SUBSTRING_INDEX(country, ',', -1)
+FROM movies 
+WHERE country LIKE '__,__'
+GROUP BY country;
+
+INSERT IGNORE INTO countries (country_code)
+SELECT 
+  SUBSTRING_INDEX(country, ',', 1)
+FROM movies 
+WHERE country LIKE '__,__,__'
+GROUP BY country
+UNION
+SELECT 
+  SUBSTRING_INDEX(country, ',', -1)
+FROM movies 
+WHERE country LIKE '__,__,__'
+GROUP BY country
+UNION
+SELECT 
+  SUBSTRING_INDEX(SUBSTRING_INDEX(country, ',', 2), ',', -1)
+FROM movies 
+WHERE country LIKE '__,__,__'
+GROUP BY country;
+
+SELECT SUBSTRING_INDEX('gb,us,it', ',', 1);
+
+CREATE TABLE movies_countries (
+  movie_id BIGINT UNSIGNED,
+  country_id BIGINT UNSIGNED,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
+  PRIMARY KEY (movie_id, country_id),
+  FOREIGN KEY (movie_id) REFERENCES movies (movie_id) ON DELETE CASCADE,
+  FOREIGN KEY (country_id) REFERENCES countries (country_id) ON DELETE CASCADE
+);
+
+INSERT INTO movies_countries (movie_id, country_id)
+SELECT
+  movies.movie_id, 
+  countries.country_id
+FROM movies
+	JOIN countries ON movies.country LIKE CONCAT('%', countries.country_code, '%')
+	WHERE movies.country <> '';
+
+ALTER TABLE movies DROP COLUMN country; 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  
+  
+  
+  
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
