@@ -112,6 +112,39 @@ END;
 
 DROP TRIGGER after_movie_update;
 
+CREATE FULLTEXT INDEX idx_overview ON movies(overview);
+
+-- Natural Language Search
+SELECT
+	title, overview, MATCH(overview) AGAINST ('the food and the drinks') AS score
+FROM movies
+WHERE MATCH(overview) AGAINST ('the food and the drinks');
+
+-- Boolean Mode Search
+SELECT
+	title, 
+  overview,
+  MATCH(overview) AGAINST ('"food romance"@10' IN BOOLEAN MODE) AS score 
+FROM
+	movies
+WHERE 
+	MATCH(overview) AGAINST ('"food romance"@10' IN BOOLEAN MODE);
+
+-- Query Expansion Search
+-- 두 번 검색 -> 리소스 많이 든다
+SELECT
+	title, 
+  overview, 
+  MATCH(overview) AGAINST ('kimchi' WITH QUERY EXPANSION) AS score
+FROM movies
+WHERE MATCH(overview) AGAINST ('kimchi' WITH QUERY EXPANSION);
+
+
+
+
+
+
+
 
 
 
