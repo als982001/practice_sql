@@ -251,3 +251,107 @@ CREATE TRIGGER updated_at_py
 BEFORE UPDATE
 ON movies
 FOR EACH ROW EXECUTE PROCEDURE log_updated_at_py();
+
+CREATE TABLE accounts (
+  account_id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  account_holder VARCHAR(100) NOT NULL,
+  balance DECIMAL(10, 2) NOT NULL CHECK (balance >= 0)
+);
+
+DROP TABLE accounts;
+
+INSERT INTO accounts (account_holder, balance) VALUES
+('nico', 1000.00),
+('lynn', 2000.00);
+
+SELECT * FROM accounts;
+
+BEGIN; -- start transaction
+  UPDATE 
+    accounts 
+  SET 
+    balance = balance + 1500 
+  WHERE account_holder =  'lynn';
+
+  SAVEPOINT transfer_one;
+
+  SELECT * FROM accounts;
+  
+  UPDATE 
+    accounts 
+  SET 
+  	account_holder = 'rich'
+  WHERE account_holder =  'lynn';
+  
+  ROLLBACK TO SAVEPOINT transfer_one;
+
+  UPDATE 
+    accounts 
+  SET 
+    balance = balance - 1500 
+  WHERE account_holder = 'nico';
+
+ROLLBACK;
+
+COMMIT; -- end transaction
+
+
+
+/*
+ACID qualities (Atomic, Consistent, Isolated, Durable)
+
+Atomicity: all or nothing
+Consistency: valid state -> valid state
+Isolation: 하나의 transaction에서 실행된 변경사항이 commit 되기 전까지는 다른 transaction에는 보이지 않는 것
+Durability: 변경사항이 적용되면(transaction이 commited되면) 변경 사항이 그대로 유지되어야 함
+
+auto commit mode: SELECT FROM, UPDATE, DELETE 등 모든 명령문이 그 자체로 하나의 작은 transaction으로 취급됨
+*/
+
+/*
+Isolation Level: transaction 외부 데이터에 대한 가시성 수준을 제어하는 것
+- read uncommitted: 한 transaction에서 일어난 변경 사항을 commit되기 전에도 다른 transaction에서 볼 수 있는 것
+- read committed: commit 되기 전에 만들어진 변경사항은 다른 transaction에서 볼 수 없는 것
+- repeatable read: 데이터 읽을 때 스냅샷
+- serializable: 아래의 모든 현상을 방지함. 하나씩 차례대로 실행
+
+
+- dirty read: transaction이 commit 되지 않은 transaction이 작성한 데이터를 읽는 것
+- non-repeatable read: transaction이 데이터를 다시 읽으려고 할 때 발생
+- phantom read: 행 집압을 반환하는 쿼리를 transaction 안에서 재실행할 때, 최근에 commit된 다른 transaction에 의해서 그 결과가 이전과 다르게 변경되는 것
+- serialization anomaly: 여러 트랜잭션의 성공적인 커밋 결과가 가능한 모든 순서로 트랜잭션을 순차적으로 실행한 결과와 일치하지 않을 때 발생.
+*/
+
+/*
+lock: 다른 transaction이 먼저 commit/rollback될 때까지 기다리는 거???
+committed read에서는 에러 발생 안하고 transaction 실행 됨
+repeatable read에서는 다른 transaction 완료되면 에러 발생, 이유: ???
+*/
+
+-- Shared Locks
+BEGIN;
+	SELECT
+  	balance
+  FROM
+  	accounts
+  WHERE
+  	account_holder = 'lynn'
+  FOR UPDATE;
+COMMIT;
+
+-- SELECT ... FOR UPDATE/SHARE: 이 코드가 실행되고 나면 commit할 때까지 아무도 해당 row를 건드릴 수 없다
+	-- UPDATE: exclusive lock
+  -- SHARE: 여러 개의 transaction에서 같은 row를 lock할 수 있음
+
+
+
+
+
+
+
+
+
+
+
+
+
