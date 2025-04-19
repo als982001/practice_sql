@@ -343,15 +343,153 @@ COMMIT;
 	-- UPDATE: exclusive lock
   -- SHARE: 여러 개의 transaction에서 같은 row를 lock할 수 있음
 
+CREATE ROLE marketer WITH login PASSWORD 'marketing4ever';
+
+GRANT SELECT, UPDATE ON movies TO marketer;
+
+GRANT SELECT, INSERT ON statuses, directors TO marketer;
+
+GRANT SELECT ON ALL TABLES IN SCHEMA PUBLIC TO marketer; -- public schema에 있는 모든 테이블에 접근 가능하게 해줌 
+
+REVOKE INSERT ON statuses, directors FROM marketer;
+
+GRANT INSERT ON ALL TABLES IN SCHEMA PUBLIC TO marketer;
+
+REVOKE INSERT ON ALL TABLES IN SCHEMA PUBLIC FROM marketer;
+
+-- ///// 
+
+CREATE ROLE editor;
+
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA PUBLIC TO editor;
+
+CREATE USER editor_one WITH PASSWORD 'words4ever';
+
+GRANT editor TO editor_one;
+
+REVOKE ALL ON movies FROM editor;
+
+GRANT SELECT (title) ON movies TO editor;
+GRANT UPDATE (budget) ON movies TO editor;
+
+ALTER ROLE editor_one WITH CONNECTION LIMIT 1;
 
 
+-- /// 
 
+-- JSON 타입: 입력된 TEXT를 그대로 복사해서 저장
+-- JSONB 타입: 분해된 Binary 형식으로 저장
+CREATE TABLE users (
+  user_id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  profile JSONB
+);
 
+DROP TABLE users;
 
+INSERT INTO users (profile) VALUES
+('{"name": "Taco", "age": 30, "city": "Budapest"}'),
+('{"name": "Giga", "age": 25, "city": "Tbilisi", "hobbies": ["reading", "climbing"]}');
+  
 
+-- JSON_BUILD_OBJECT: 객체로 만들어주는 함수
+SELECT JSON_BUILD_OBJECT('name', 'Taco', 'age', 30, 'city', 'Budapest');
+  
+-- 찾기  
+  
+SELECT 
+	profile ->> 'name' AS name, -- ->> 처럼 > 두 번 적으면 따옴표 없어짐
+  profile -> 'city' AS city, 
+  profile -> 'age' AS age,
+  profile -> 'hobbies' -> 0 AS first_hobby -- 첫 번째 hobby
+FROM 
+	users;
+  
+SELECT 
+	profile ->> 'name' AS name, -- ->> 처럼 > 두 번 적으면 ??
+  profile -> 'city' AS city, 
+  profile -> 'age' AS age,
+  profile -> 'hobbies' -> 0 AS first_hobby -- 첫 번째 hobby
+FROM 
+	users
+WHERE profile ? 'hobbies'; 
+  
+SELECT 
+	profile ->> 'name' AS name, 
+  profile -> 'city' AS city, 
+  profile -> 'age' AS age,
+  profile -> 'hobbies' -> 0 AS first_hobby -- 첫 번째 hobby
+FROM 
+	users
+WHERE profile -> 'hobbies' ? 'climbing';  
 
+SELECT 
+	profile ->> 'name' AS name,
+  profile -> 'city' AS city, 
+ 	JSONB_ARRAY_LENGTH(profile -> 'hobbies') AS total_hobbies
+FROM 
+	users;
+  
+SELECT 
+	profile ->> 'name' AS name,
+  profile -> 'city' AS city, 
+ 	JSONB_ARRAY_LENGTH(profile -> 'hobbies') AS total_hobbies
+FROM 
+	users
+WHERE (profile ->> 'age')::INTEGER < 30; 
+  
+  
+SELECT 
+	profile ->> 'name' AS name,
+  profile -> 'city' AS city, 
+ 	JSONB_ARRAY_LENGTH(profile -> 'hobbies') AS total_hobbies
+FROM 
+	users
+WHERE profile -> 'hobbies' ?| ARRAY['reading', 'traveling'];
+  
+SELECT 
+	profile ->> 'name' AS name,
+  profile -> 'city' AS city, 
+ 	JSONB_ARRAY_LENGTH(profile -> 'hobbies') AS total_hobbies
+FROM 
+	users
+WHERE profile ?| ARRAY['name', 'email'];
+  
+SELECT 
+	profile ->> 'name' AS name,
+  profile -> 'city' AS city, 
+ 	JSONB_ARRAY_LENGTH(profile -> 'hobbies') AS total_hobbies
+FROM 
+	users
+WHERE profile ->> 'city' LIKE 'B%';
+  
+  
+-- 수정
+  
+UPDATE users
+SET profile = profile || JSONB_BUILD_OBJECT('email', 'x@x,com');
 
+UPDATE 
+	users
+SET 
+	profile = profile - 'email'
+WHERE profile ->> 'name' = 'Giga';
 
+UPDATE 
+	users
+SET 
+	profile = profile || JSONB_BUILD_OBJECT('hobbies', JSONB_BUILD_ARRAY('climbing', 'traveling'))
+WHERE profile ->> 'name' = 'Taco';
 
-
-
+SELECT 
+	(profile -> 'hobbies') - 'climbing'
+FROM
+	users;
+  
+UPDATE
+	users
+SET 
+	profile = profile || JSONB_SET(
+    profile, 
+    '{hobbies}', 
+    (profile -> 'hobbies') || JSONB_BUILD_ARRAY('cooking')
+);
