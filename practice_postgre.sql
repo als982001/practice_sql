@@ -493,3 +493,99 @@ SET
     '{hobbies}', 
     (profile -> 'hobbies') || JSONB_BUILD_ARRAY('cooking')
 );
+
+SELECT * FROM pg_available_extensions;
+
+-- Extension 01: hstore
+CREATE EXTENSION hstore;
+DROP EXTENSION hstore;
+
+DROP TABLE users;
+
+CREATE TABLE users (
+  user_id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  prefs HSTORE
+);
+
+INSERT INTO users (prefs) VALUES
+('theme => dark, lang => kr, notifications => off'),
+('theme => light, lang => es, notifications => on, push_notifications => on, email_notifications => off'),
+('theme => dark, lang => it, start_page => dashboard, font_size => large');
+
+SELECT * FROM users;
+
+SELECT 
+	user_id,
+  prefs -> 'theme',
+  prefs -> ARRAY['lang', 'notifications'],
+  prefs ? 'font_size' AS has_font_size, -- ?: 해당 key가 존재하는지
+  prefs ?| ARRAY['push_notifications', 'start_page'], -- ?|: 배열에 있는 것들이 존재하는지
+	AKEYS(prefs), -- akeys: 모든 key들
+  AVALS(prefs), -- avals: 모든 value들
+  EACH(prefs)
+FROM users;
+
+UPDATE 
+	users
+SET
+	prefs['theme'] = 'light'
+WHERE user_id = 1;
+
+UPDATE 
+	users
+SET
+	prefs = prefs || hstore(
+  	ARRAY['currency', 'cookies_ok'],
+    ARRAY['krw', 'yes']
+  )
+WHERE user_id = 1;
+
+UPDATE 
+	users
+SET
+	prefs = DELETE(prefs, 'cookies_ok')
+WHERE user_id = 1;
+
+-- Extension 02: PGCrypto
+CREATE EXTENSION pgcrypto;
+DROP TABLE users;
+CREATE TABLE users (
+  user_id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  username VARCHAR(100), 
+  password VARCHAR(100)
+);
+
+INSERT INTO users (username, password)
+VALUES 
+	('nico', CRYPT('user_password', GEN_SALT('bf'))),
+	('testUser02', CRYPT(CRYPT('user_password', GEN_SALT('bf')), GEN_SALT('bf')));
+
+SELECT 
+	username 
+FROM 
+	users 
+WHERE
+	username = 'nico' 
+	AND password = CRYPT('user_password', password);
+
+
+-- Extension 01: uuid-ossp 
+DROP TABLE users;
+
+CREATE EXTENSION "uuid-ossp";
+
+CREATE TABLE users (
+	user_id UUID PRIMARY KEY DEFAULT(UUID_GENERATE_V4()),
+  username VARCHAR(100), 
+  password VARCHAR(100)
+);
+
+INSERT INTO users (username, password)
+VALUES ('nico', '1234');
+
+SELECT * FROM users;
+
+
+
+
+
